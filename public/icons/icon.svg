@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ff5fa2"/>
+      <stop offset="0.55" stop-color="#7b3ff2"/>
+      <stop offset="1" stop-color="#2a1a5e"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#g)"/>
+  <circle cx="400" cy="110" r="44" fill="#ffd23f" opacity="0.95"/>
+  <text x="256" y="340" font-size="260" text-anchor="middle" font-family="Apple Color Emoji, Noto Color Emoji, Segoe UI Emoji, sans-serif">🐪</text>
+  <text x="256" y="455" font-size="64" font-weight="900" text-anchor="middle" fill="#fff" font-family="ui-rounded, system-ui, sans-serif" letter-spacing="2">WED</text>
+</svg>
