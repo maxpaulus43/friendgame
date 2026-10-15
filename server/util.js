@@ -37,3 +37,5 @@ export const rankPoints = (entries, table = [300, 200, 150, 100, 75, 50, 40, 30,
 
 // An error whose message is safe and useful to show the player.
 export class UserError extends Error {}
+
+export const randInt = (lo, hi) => lo + Math.floor(Math.random() * (hi - lo + 1));

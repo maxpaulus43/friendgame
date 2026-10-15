@@ -49,8 +49,33 @@ function promptCard(view) {
 }
 
 function mediaEl(kind, url) {
-  if (kind === 'photo') return h('img', { class: 'photo', src: url, alt: '', loading: 'lazy' });
+  if (kind === 'photo') return photo(url);
   return audioButton(url);
+}
+
+// A photo that retries if the download hiccups (flaky cell signal), and
+// offers a tap-to-reload if it still won't show.
+export function photo(url, props = {}) {
+  let tries = 0;
+  const img = h('img', { class: 'photo', alt: '', ...props });
+  const wrap = h('div', { class: 'photo-wrap' }, img);
+  img.addEventListener('load', () => wrap.classList.remove('broken'));
+  img.addEventListener('error', () => {
+    if (tries < 4) {
+      tries++;
+      setTimeout(() => (img.src = `${url}?try=${tries}`), 700 * tries);
+      return;
+    }
+    wrap.classList.add('broken');
+  });
+  wrap.addEventListener('click', () => {
+    if (!wrap.classList.contains('broken')) return;
+    tries = 0;
+    wrap.classList.remove('broken');
+    img.src = `${url}?try=${Date.now()}`;
+  });
+  img.src = url;
+  return wrap;
 }
 
 let playing = null;
@@ -270,7 +295,7 @@ function voteStep(el, c) {
       'div',
       { class: `card entry ${e.mine ? 'mine' : ''}` },
       h('div', { class: 'entry-head' }, h('b', {}, label), h('span', { class: 'spacer' }), btn),
-      v.kind === 'photo' ? h('img', { class: 'photo', src: e.url, alt: label, onclick: () => !e.mine && c.send('vote', { id: e.id }) }) : audioButton(e.url),
+      v.kind === 'photo' ? photo(e.url, { alt: label, onclick: () => !e.mine && c.send('vote', { id: e.id }) }) : audioButton(e.url),
     );
   });
   const status = h('div');

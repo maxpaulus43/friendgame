@@ -10,8 +10,12 @@ import hottakes from './games/hottakes.js';
 import mostlikely from './games/mostlikely.js';
 import pitch from './games/pitch.js';
 import countup from './games/countup.js';
+import imposter from './games/imposter.js';
+import twotruths from './games/twotruths.js';
+import spectrum from './games/spectrum.js';
+import telephone from './games/telephone.js';
 
-const MODULES = { snap, sound, shake, homing, bomb, hottakes, mostlikely, pitch, countup };
+const MODULES = { snap, sound, shake, homing, bomb, hottakes, mostlikely, pitch, siren: pitch, countup, imposter, twotruths, spectrum, telephone };
 
 const AVATARS = ['🦊', '🐸', '🐙', '🦄', '🐔', '🐢', '🦖', '🐼', '🦉', '🐝', '🦀', '🐷', '🐵', '🦩', '🐳', '🦔', '👽', '🤖', '👻', '🤠', '🧙', '🥑', '🌮', '🍕'];
 
@@ -63,6 +67,16 @@ const root = document.getElementById('app');
 const header = document.getElementById('header');
 
 const serverNow = () => Date.now() + state.offset;
+
+// The host's round settings follow them from week to week on this phone.
+function savedSettings() {
+  try {
+    return JSON.parse(ls.get('settings')) || undefined;
+  } catch {
+    return undefined;
+  }
+}
+const MINUTES_PER_ROUND = 4;
 const player = (pid) => state.room?.players.find((p) => p.id === pid);
 const isHost = () => state.room?.hostId === me.pid;
 
@@ -279,7 +293,7 @@ function homeScreen(el) {
   };
   const create = () => {
     if (!saveMe()) return;
-    net.send({ t: 'create', pid: me.pid, name: me.name, avatar: me.avatar });
+    net.send({ t: 'create', pid: me.pid, name: me.name, avatar: me.avatar, settings: savedSettings() });
   };
 
   const joinBox = h(
@@ -358,7 +372,7 @@ function lobbyScreen(el) {
   return {
     update(c) {
       const room = c.room;
-      const sig = JSON.stringify([room.hostId, c.isHost, room.players]);
+      const sig = JSON.stringify([room.hostId, c.isHost, room.players, room.settings]);
       if (sig === lastSig) return;
       lastSig = sig;
       const host = player(room.hostId);
@@ -374,6 +388,14 @@ function lobbyScreen(el) {
         } catch {}
       };
       const players = [...room.players].sort((a, b) => b.score - a.score);
+      const rounds = room.settings.rounds;
+      const connected = room.players.filter((p) => p.connected).length;
+      const nightRounds = room.catalog.filter((g) => g.minPlayers <= connected).reduce((n, g) => n + (rounds[g.id] || 0), 0);
+      const setRounds = (id, n) => {
+        const next = { ...rounds, [id]: Math.max(0, Math.min(3, n)) };
+        ls.set('settings', JSON.stringify({ rounds: next }));
+        c.host('settings', { settings: { rounds: next } });
+      };
       const anyScore = players.some((p) => p.score > 0);
       replace(
         body,
@@ -409,26 +431,24 @@ function lobbyScreen(el) {
           ? h(
               'div',
               { class: 'card' },
-              h('button', { class: 'btn primary huge wide', onclick: () => c.host('start', { game: 'night' }) }, '🎉 Start the Night'),
-              h('p', { class: 'muted small center' }, '7 rounds, a little bit of everything. Scores reset.'),
+              h('button', { class: 'btn primary huge wide', onclick: () => c.host('start', { game: 'night' }), disabled: !nightRounds }, '🎉 Start the Night'),
+              h('p', { class: 'muted small center' }, nightRounds ? `${nightRounds} rounds, about ${nightRounds * MINUTES_PER_ROUND} minutes. Scores reset. Change the lineup below.` : 'Turn on at least one game below.'),
             )
           : h('div', { class: 'card center' }, h('p', {}, `Waiting for ${host?.name ?? 'the host'} to start…`), h('div', { class: 'bounce' }, '⏳')),
         h(
           'div',
           { class: 'card' },
-          h('h3', {}, c.isHost ? 'Or play just one' : 'Tonight\'s menu'),
+          h('h3', {}, 'Tonight\'s lineup'),
+          h('p', { class: 'muted small' }, c.isHost ? 'Set how many rounds of each game the night includes (0 leaves it out). Tap ▶ to play just that game now.' : 'Rounds of each game in tonight\'s night.'),
           h(
             'div',
             { class: 'game-list' },
             room.catalog.map((g) => {
-              const tooFew = room.players.filter((p) => p.connected).length < g.minPlayers;
+              const tooFew = connected < g.minPlayers;
+              const n = rounds[g.id] || 0;
               return h(
-                'button',
-                {
-                  class: 'game-card',
-                  disabled: !c.isHost || tooFew,
-                  onclick: () => c.host('start', { game: g.id }),
-                },
+                'div',
+                { class: `game-card ${n ? '' : 'off'}` },
                 h('div', { class: 'game-emoji' }, g.emoji),
                 h(
                   'div',
@@ -437,6 +457,20 @@ function lobbyScreen(el) {
                   h('div', { class: 'small muted' }, g.blurb),
                   h('div', { class: 'chips' }, g.tags.map((t) => h('span', { class: `chip tag-${t}` }, TAG_LABELS[t])), g.sensors.map((s) => h('span', { class: 'chip sensor' }, SENSOR_LABELS[s]))),
                   tooFew ? h('div', { class: 'small warn' }, `Needs ${g.minPlayers}+ players`) : null,
+                  c.isHost
+                    ? h(
+                        'div',
+                        { class: 'game-controls' },
+                        h(
+                          'div',
+                          { class: 'stepper', role: 'group', 'aria-label': `Rounds of ${g.name}` },
+                          h('button', { class: 'btn small', onclick: () => setRounds(g.id, n - 1), disabled: n <= 0, 'aria-label': 'Fewer rounds' }, '−'),
+                          h('span', { class: 'stepper-val' }, n ? `${n} round${n > 1 ? 's' : ''}` : 'Off'),
+                          h('button', { class: 'btn small', onclick: () => setRounds(g.id, n + 1), disabled: n >= 3, 'aria-label': 'More rounds' }, '+'),
+                        ),
+                        h('button', { class: 'btn small primary', disabled: tooFew, onclick: () => c.host('start', { game: g.id }) }, `▶ Play${n > 1 ? ` ×${n}` : ''}`),
+                      )
+                    : h('div', { class: 'small muted' }, n ? `${n} round${n > 1 ? 's' : ''} tonight` : 'Not tonight'),
                 ),
               );
             }),
@@ -459,18 +493,25 @@ function playerMenu(c, p) {
 
 function nightBadge(c) {
   const n = c.room.night;
-  return n ? h('div', { class: 'night-badge' }, `Round ${n.i + 1} of ${n.total}`) : null;
+  const rep = c.round?.repeat;
+  const parts = [];
+  if (n && n.kind === 'night') parts.push(`Round ${n.i + 1} of ${n.total}`);
+  if (rep) parts.push(`${c.meta?.name ?? 'Game'} ${rep.k} of ${rep.of}`);
+  return parts.length ? h('div', { class: 'night-badge' }, parts.join(' · ')) : null;
 }
 
-function hostBar(c, { skipLabel = 'Skip ⏭' } = {}) {
+function hostBar(c, { skipLabel = '⏩ Skip timer' } = {}) {
   if (!c.isHost) return null;
+  const queue = c.room.night;
+  const moreAfter = queue && queue.list.slice(queue.i).some((id) => id !== c.round?.gameId);
+  const skipGameLabel = moreAfter ? '⏭ Next game' : '⏭ Skip game';
+  const skipGameAsk = moreAfter ? `Skip the rest of ${c.meta?.name} and move on to the next game?` : `Skip the rest of ${c.meta?.name}?`;
   return h(
     'div',
-    { class: 'host-bar' },
-    h('span', { class: 'muted small' }, '👑 Host'),
-    h('span', { class: 'spacer' }),
+    { class: 'host-bar', 'aria-label': 'Host controls' },
     c.round?.deadline ? h('button', { class: 'btn small', onclick: () => c.host('skip') }, skipLabel) : null,
-    h('button', { class: 'btn small ghost', onclick: () => confirm('End this game and go back to the lobby?') && c.host('end') }, 'End'),
+    c.round && c.round.step !== 'results' ? h('button', { class: 'btn small', onclick: () => confirm(skipGameAsk) && c.host('skipGame') }, skipGameLabel) : null,
+    h('button', { class: 'btn small ghost', onclick: () => confirm('End the night and go back to the lobby?') && c.host('end') }, 'End'),
   );
 }
 
@@ -485,6 +526,7 @@ function introScreen(el) {
   const readyBtn = h('button', { class: 'btn huge wide primary pulse', onclick: onReady });
   const readyRow = h('div', { class: 'done-row' });
   const startAnyway = h('div');
+  const autoStart = h('div', { class: 'center muted' });
   const footer = h('div');
   const body = h(
     'div',
@@ -494,6 +536,7 @@ function introScreen(el) {
     h('div', { class: 'card' }, h('h3', {}, 'How to play'), h('ol', { class: 'howto' }, g.howTo.map((x) => h('li', {}, x)))),
     g.sensors.length ? h('div', { class: 'chips center' }, g.sensors.map((s) => h('span', { class: 'chip sensor' }, `Uses ${SENSOR_LABELS[s]}`))) : null,
     errorsBox,
+    autoStart,
     readyBtn,
     readyRow,
     startAnyway,
@@ -529,9 +572,10 @@ function introScreen(el) {
       readyBtn.classList.toggle('primary', !ready);
       readyBtn.classList.toggle('pulse', !ready && !preparing);
       readyBtn.textContent = ready ? '✅ Ready!' : preparing ? 'Getting set up…' : g.needs.length ? "👍 I'm ready (allow access)" : "👍 I'm ready";
-      const sig = JSON.stringify([r.ready, r.participants, c.isHost, amIn, c.room.players.map((p) => p.connected)]);
+      const sig = JSON.stringify([r.ready, r.participants, c.isHost, amIn, c.room.players.map((p) => p.connected), r.deadline]);
       if (sig === lastSig) return;
       lastSig = sig;
+      replace(autoStart, r.deadline ? ['Same rules as last round. Starting in ', timer(r.deadline), '…'] : null);
       const notReady = r.participants.filter((id) => !r.ready.includes(id) && player(id)?.connected);
       replace(
         readyRow,
@@ -617,6 +661,7 @@ function resultsScreen(el) {
         .sort((a, b) => b.pts - a.pts);
       const night = c.room.night;
       const lastRound = night && night.i + 1 >= night.total;
+      const nextLabel = !night ? '↩ Back to lobby' : lastRound ? (night.kind === 'night' ? '🏆 Final scores' : '↩ Back to lobby') : night.list[night.i + 1] === r.gameId ? '▶ Next round' : '▶ Next game';
       replace(
         body,
         nightBadge(c),
@@ -643,7 +688,7 @@ function resultsScreen(el) {
           ),
         ),
         c.isHost
-          ? h('button', { class: 'btn primary huge wide', onclick: () => c.host('next') }, night ? (lastRound ? '🏆 Final scores' : '▶ Next round') : '↩ Back to lobby')
+          ? h('button', { class: 'btn primary huge wide', onclick: () => c.host('next') }, nextLabel)
           : h('p', { class: 'center muted' }, `Waiting for ${player(c.room.hostId)?.name ?? 'the host'} to continue…`),
       );
     },

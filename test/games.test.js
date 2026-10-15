@@ -70,6 +70,10 @@ class Bot {
       if (!check()) this.waiters.push(check);
     });
   }
+  nextState(ms = 3000) {
+    let seen = false;
+    return this.until(() => (seen ? true : ((seen = true), false)), 'next state', ms).catch(() => {});
+  }
   untilStep(step, ms) {
     return this.until((s) => s.round?.step === step, `step ${step}`, ms);
   }
@@ -193,13 +197,14 @@ test('snap judgment: upload, vote, media served with ranges', async () => {
 test('bomb squad: holding together defuses it', async () => {
   const bots = await makeRoom();
   await startGame(bots, 'bomb');
-  for (let stage = 0; stage < 3; stage++) {
+  assert.equal(bots[0].view.stages, 4);
+  for (let stage = 0; stage < 4; stage++) {
     await bots[0].until((s) => s.round.step === 'results' || s.round.view.stage === stage, `stage ${stage}`);
     bots.forEach((b) => b.g('zone', { stage, in: true }));
   }
-  await bots[0].untilStep('results', 15000);
+  await bots[0].untilStep('results', 20000);
   assert.equal(bots[0].view.outcome, 'defused');
-  assert.equal(points(bots[0])[bots[1].pid], 250);
+  assert.equal(points(bots[0])[bots[1].pid], 300);
   closeAll(bots);
 });
 
@@ -247,28 +252,178 @@ test('sound off: needs audio mime', async () => {
   closeAll(bots);
 });
 
-test('a full night: 7 rounds, then the champion', async () => {
+// Host fast-forwards through every step of the current round.
+async function skipToResults(host) {
+  for (let guard = 0; host.round.step !== 'results' && guard < 200; guard++) {
+    host.host('skip');
+    await host.nextState(1500);
+  }
+  assert.equal(host.round.step, 'results', `stuck in ${host.round.gameId}:${host.round.step}`);
+}
+
+test('a full night plays the lineup from the settings, then crowns a champion', async () => {
   const bots = await makeRoom();
+  const rounds = Object.fromEntries(bots[0].state.catalog.map((g) => [g.id, 1]));
+  rounds.snap = 2;
+  bots[0].host('settings', { settings: { rounds } });
+  await bots[0].until((s) => s.settings.rounds.snap === 2, 'settings');
   bots[0].host('start', { game: 'night' });
   await bots[0].untilStep('intro');
   const list = bots[0].state.night.list;
-  assert.equal(list.length, 7);
-  assert.equal(new Set(list).size, 7);
-  for (let i = 0; i < 7; i++) {
-    await bots[0].until((s) => s.round?.step === 'intro' && s.night.i === i, `round ${i}`);
+  assert.equal(list.length, bots[0].state.catalog.length + 1);
+  // Both Snap Judgment rounds play back to back.
+  assert.equal(list.indexOf('snap') + 1, list.lastIndexOf('snap'));
+  for (let i = 0; i < list.length; i++) {
+    await bots[0].until((s) => s.round?.step === 'intro' && s.night.i === i, `round ${i} (${list[i]})`);
     bots[0].host('begin');
     await bots[0].until((s) => s.round.step !== 'intro', 'begun');
-    // Host fast-forwards through every step.
-    while (bots[0].round.step !== 'results') {
-      const step = bots[0].round.step;
-      bots[0].host('skip');
-      await bots[0].until((s) => s.round.step !== step || s.round.view?.qi !== undefined, 'skip').catch(() => {});
-      await new Promise((r) => setTimeout(r, 80));
-    }
+    await skipToResults(bots[0]);
     bots[0].host('next');
   }
   await bots[0].until((s) => s.phase === 'final', 'final');
   assert.equal(bots[0].state.final.standings.length, 3);
+  closeAll(bots);
+});
+
+test('playing one game runs its round count; repeats start on their own; skip game moves on', async () => {
+  const bots = await makeRoom();
+  bots[0].host('settings', { settings: { rounds: { hottakes: 3 } } });
+  await bots[0].until((s) => s.settings.rounds.hottakes === 3, 'settings');
+  await startGame(bots, 'hottakes');
+  assert.deepEqual(bots[0].state.night.list, ['hottakes', 'hottakes', 'hottakes']);
+  assert.deepEqual(bots[0].round.repeat, { k: 1, of: 3 });
+  await skipToResults(bots[0]);
+  bots[0].host('next');
+  await bots[0].until((s) => s.round?.step === 'intro' && s.round.repeat?.k === 2, 'second round intro');
+  assert.ok(bots[0].round.deadline, 'repeat intro has an auto-start countdown');
+  bots[0].host('skipGame');
+  await bots[0].until((s) => s.phase === 'lobby', 'back to lobby after skipping the game');
+  closeAll(bots);
+});
+
+test('skip game in a night jumps to the next different game', async () => {
+  const bots = await makeRoom();
+  const rounds = Object.fromEntries(bots[0].state.catalog.map((g) => [g.id, 0]));
+  Object.assign(rounds, { shake: 2, mostlikely: 1 });
+  bots[0].host('settings', { settings: { rounds } });
+  await bots[0].until((s) => s.settings.rounds.shake === 2, 'settings');
+  bots[0].host('start', { game: 'night' });
+  await bots[0].untilStep('intro');
+  const first = bots[0].round.gameId;
+  bots[0].host('skipGame');
+  await bots[0].until((s) => s.round && s.round.gameId !== first, 'next game');
+  bots[0].host('skipGame');
+  await bots[0].until((s) => s.phase === 'final', 'final after last game skipped');
+  closeAll(bots);
+});
+
+test('imposter: caught imposter can steal it by guessing the word', async () => {
+  const bots = await makeRoom();
+  await startGame(bots, 'imposter');
+  const imp = bots.find((b) => b.view.isImposter);
+  const others = bots.filter((b) => b !== imp);
+  assert.equal(imp.view.word, null);
+  assert.ok(others[0].view.word);
+  const word = others[0].view.word;
+  bots.forEach((b) => b.g('done'));
+  await bots[0].untilStep('vote');
+  others.forEach((b) => b.g('vote', { pid: imp.pid }));
+  imp.g('vote', { pid: others[0].pid });
+  await imp.untilStep('reveal');
+  assert.equal(imp.view.caught, true);
+  assert.equal(imp.view.word, null, 'caught imposter must not see the word before guessing');
+  bots[0].host('skip');
+  await imp.untilStep('guess');
+  assert.ok(imp.view.words.includes(word));
+  imp.g('guess', { word });
+  await bots[0].untilStep('results');
+  assert.equal(bots[0].view.outcome, 'stole');
+  assert.equal(points(bots[0])[imp.pid], 200);
+  closeAll(bots);
+});
+
+test('two truths: guess the lie, liars score for fooling people', async () => {
+  const bots = await makeRoom();
+  await startGame(bots, 'twotruths');
+  bots.forEach((b) => b.g('submit', { statements: [`${b.name} one`, `${b.name} two`, `${b.name} lie`], lie: 2 }));
+  for (let q = 0; q < 3; q++) {
+    await bots[0].until((s) => s.round.step === 'guess' && s.round.view.qi === q, `guess ${q}`);
+    const author = bots[0].view.author;
+    const lieIdx = bots[0].view.statements.findIndex((x) => x.endsWith('lie'));
+    for (const b of bots) if (b.pid !== author) b.g('guess', { i: b === bots.find((x) => x.pid !== author) ? lieIdx : (lieIdx + 1) % 3 });
+    await bots[0].untilStep('reveal');
+    assert.equal(bots[0].view.lie, lieIdx);
+    bots[0].host('skip');
+  }
+  await bots[0].untilStep('results');
+  // Each player: fooled one person (+75) and guessed right on someone at least once.
+  for (const b of bots) assert.ok(points(bots[0])[b.pid] >= 75);
+  closeAll(bots);
+});
+
+test('spectrum: clue-giver sees the target, guessers score by distance', async () => {
+  const bots = await makeRoom(2);
+  await startGame(bots, 'spectrum');
+  for (let t = 0; t < 2; t++) {
+    await Promise.all(bots.map((b) => b.until((s) => s.round.step === 'clue' && s.round.view.turn === t, `turn ${t}`)));
+    const giver = bots.find((b) => b.view.isGiver);
+    const guesser = bots.find((b) => !b.view.isGiver);
+    assert.equal(guesser.view.target, null);
+    const target = giver.view.target;
+    giver.g('clue', { clue: 'a sauna' });
+    await guesser.untilStep('guess');
+    guesser.g('guess', { v: target + 3 });
+    await bots[0].untilStep('reveal');
+    assert.equal(bots[0].view.points[guesser.pid], 100);
+    assert.equal(bots[0].view.points[giver.pid], 100);
+    bots[0].host('skip');
+  }
+  await bots[0].untilStep('results');
+  assert.equal(points(bots[0])[bots[0].pid], 200);
+  closeAll(bots);
+});
+
+test('doodle telephone: write, draw, guess, then flip through the album', async () => {
+  const bots = await makeRoom();
+  await startGame(bots, 'telephone');
+  assert.equal(bots[0].view.kind, 'write');
+  bots.forEach((b) => b.g('submit', { text: `${b.name}'s phrase` }));
+  await bots[0].untilStep('draw');
+  // Each drawer got someone else's phrase.
+  for (const b of bots) {
+    await b.untilStep('draw');
+    assert.ok(b.view.prev.text.endsWith("'s phrase") && !b.view.prev.text.startsWith(b.name));
+  }
+  const png = 'data:image/jpeg;base64,' + Buffer.from('drawing').toString('base64');
+  bots.forEach((b) => b.g('submit', { data: png }));
+  await bots[0].untilStep('guess');
+  for (const b of bots) await b.untilStep('guess');
+  assert.ok(bots[1].view.prev.url.startsWith('/media/'));
+  bots.slice(0, 2).forEach((b) => b.g('submit', { text: 'a cat?' }));
+  await bots[0].until((s) => s.round.view.done.length === 2, 'two guesses in');
+  bots[0].host('skip'); // the third player ran out of time
+  await bots[0].untilStep('reveal');
+  const chains = bots[0].view.chains;
+  assert.equal(chains.length, 3);
+  assert.equal(chains.flatMap((c) => c.entries).filter((e) => e.missing).length, 1);
+  for (let i = 0; i < 9; i++) {
+    bots[0].g('reveal');
+    await bots[0].nextState(1000);
+  }
+  await bots[0].untilStep('results');
+  // Two entries (+40 each), plus +50 if their own chain made it all the way round.
+  assert.ok([80, 130].includes(points(bots[0])[bots[2].pid]));
+  closeAll(bots);
+});
+
+test('siren song: phones send a score per phrase', async () => {
+  const bots = await makeRoom(1);
+  await startGame(bots, 'siren');
+  assert.equal(bots[0].view.mode, 'siren');
+  assert.deepEqual(bots[0].view.targets.map((t) => t.type).sort(), ['glide', 'steps', 'wave']);
+  bots[0].g('result', { scores: [80, 50, 999] });
+  await bots[0].untilStep('results');
+  assert.equal(points(bots[0])[bots[0].pid], 80 + 50 + 100 + 100);
   closeAll(bots);
 });
 

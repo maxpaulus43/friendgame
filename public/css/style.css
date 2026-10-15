@@ -947,3 +947,339 @@ p {
     background: rgba(255, 77, 109, 0.35);
   }
 }
+
+.photo-wrap {
+  position: relative;
+  min-height: 120px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.3);
+}
+.photo-wrap.broken::after {
+  content: 'Photo didn’t load. Tap to retry.';
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  font-weight: 700;
+}
+.photo-wrap.broken .photo {
+  visibility: hidden;
+}
+
+.siren-canvas {
+  display: block;
+  width: 100%;
+  border-radius: var(--radius);
+  border: 1px solid var(--card-border);
+}
+.level-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.bar.level {
+  height: 10px;
+}
+.bar.level .fill {
+  background: linear-gradient(90deg, var(--good), var(--yellow));
+  transition: width 0.05s linear;
+}
+
+.spark {
+  position: absolute;
+  width: 14%;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  display: grid;
+  place-items: center;
+  font-size: 26px;
+  filter: drop-shadow(0 0 8px var(--yellow));
+  pointer-events: none;
+}
+.ball.zapped {
+  background: radial-gradient(circle at 35% 30%, #fff, var(--yellow) 45%, #8a6a00);
+  box-shadow: 0 0 26px var(--yellow);
+}
+
+.game-card.off {
+  opacity: 0.55;
+}
+.game-info {
+  flex: 1;
+  min-width: 0;
+}
+.game-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+.stepper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.stepper .btn {
+  min-width: 36px;
+  font-size: 1.1rem;
+  padding: 4px 10px;
+}
+.stepper-val {
+  min-width: 70px;
+  text-align: center;
+  font-weight: 800;
+  font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
+}
+.host-bar {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+  padding: 8px;
+}
+.host-bar::before {
+  content: '👑';
+  margin-right: auto;
+}
+
+/* imposter */
+.secret-word {
+  font-size: 2.4rem;
+  font-weight: 900;
+  color: var(--yellow);
+  letter-spacing: 0.5px;
+}
+.secret.imposter {
+  border-color: var(--bad);
+  background: rgba(255, 77, 109, 0.12);
+}
+.order-list {
+  padding-left: 24px;
+  margin: 6px 0;
+  font-weight: 700;
+}
+.order-list li {
+  margin: 4px 0;
+}
+.word-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+/* two truths */
+.tt-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.tt-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+textarea.input {
+  resize: none;
+  font-size: 1rem;
+}
+.lie-btn {
+  align-self: flex-end;
+}
+.lie-btn.on {
+  background: var(--bad);
+}
+.statements {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.statement {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  padding: 14px;
+  border-radius: 16px;
+  background: var(--card);
+  border: 2px solid var(--card-border);
+}
+.statement b {
+  font-size: 1.2rem;
+}
+.statement.on {
+  border-color: var(--primary);
+  background: rgba(255, 95, 162, 0.18);
+}
+.statement:disabled {
+  opacity: 1;
+}
+.statement.lie {
+  border-color: var(--bad);
+  background: rgba(255, 77, 109, 0.15);
+}
+.statement.truth {
+  opacity: 0.75;
+}
+
+/* spectrum */
+.spec {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.spec-labels {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-weight: 800;
+  font-size: 0.9rem;
+}
+.spec-labels span:last-child {
+  text-align: right;
+}
+.spec-track {
+  position: relative;
+  height: 64px;
+  border-radius: 14px;
+  background: linear-gradient(90deg, #3ed6e0 0%, #8a5cf6 50%, #ff5fa2 100%);
+  overflow: hidden;
+}
+.spec-band {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+}
+.spec-band.b30 {
+  background: rgba(255, 255, 255, 0.25);
+}
+.spec-band.b60 {
+  background: rgba(255, 255, 255, 0.45);
+}
+.spec-band.b100 {
+  background: var(--yellow);
+}
+.spec-marker {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 26px;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
+}
+.spec-dial {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  background: transparent;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.spec-dial::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 64px;
+  border-radius: 7px;
+  background: #fff;
+  box-shadow: 0 0 0 3px var(--bg), 0 4px 12px rgba(0, 0, 0, 0.5);
+}
+.spec-dial::-moz-range-thumb {
+  width: 14px;
+  height: 64px;
+  border-radius: 7px;
+  background: #fff;
+  border: 0;
+}
+
+/* doodle telephone */
+.pad-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.pad {
+  width: 100%;
+  max-width: 100%;
+  aspect-ratio: 1;
+  border-radius: 14px;
+  background: #fff;
+  touch-action: none;
+  display: block;
+}
+.pad-tools {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.swatches {
+  display: grid;
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+  gap: 6px;
+}
+.swatch {
+  aspect-ratio: 1;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  padding: 0;
+}
+.swatch.on {
+  border-color: #fff;
+  box-shadow: 0 0 0 3px var(--primary);
+}
+.size-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  border: 2px solid transparent;
+  background: rgba(255, 255, 255, 0.1);
+  display: grid;
+  place-items: center;
+  padding: 0;
+}
+.size-btn span {
+  display: block;
+  border-radius: 50%;
+  background: var(--text);
+}
+.size-btn.on {
+  border-color: var(--primary);
+}
+.tele-draw {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.album {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.album-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.album-entry .photo {
+  background: #fff;
+}
+.album-text {
+  font-size: 1.3rem;
+  font-weight: 800;
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.08);
+}
+.album-entry.missing {
+  opacity: 0.6;
+}
+.pop {
+  animation: in 0.35s ease-out;
+}
+.host-bar .btn.small {
+  padding: 7px 10px;
+}

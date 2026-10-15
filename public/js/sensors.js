@@ -129,14 +129,31 @@ export function audioCtx() {
 export async function getMic() {
   if (st.mic && st.mic.getAudioTracks().some((t) => t.readyState === 'live')) return st.mic;
   if (!navigator.mediaDevices?.getUserMedia) throw new Error('This browser can\'t use the microphone (needs HTTPS).');
-  // Let iOS keep playing sound through the speaker while recording.
-  try {
-    if (navigator.audioSession) navigator.audioSession.type = 'play-and-record';
-  } catch {}
+  // Auto-gain on so quiet singers still register; echo cancellation and
+  // noise suppression off because they treat a held note as noise.
   st.mic = await navigator.mediaDevices.getUserMedia({
-    audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
+    audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: true },
   });
   return st.mic;
+}
+
+// An AudioContext made *after* the mic is open. On some iPhones a context
+// created earlier hears only silence from the mic. While the mic is live,
+// Safari lets this new context start without another tap.
+export async function micAudioCtx() {
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) return audioCtx();
+  if (st.audio && st.audioAfterMic) {
+    if (st.audio.state !== 'running') await st.audio.resume().catch(() => {});
+    return st.audio;
+  }
+  try {
+    st.audio?.close();
+  } catch {}
+  st.audio = new AC();
+  st.audioAfterMic = true;
+  await st.audio.resume().catch(() => {});
+  return st.audio;
 }
 
 export function hasMic() {
@@ -147,19 +164,25 @@ export function hasMic() {
 export function releaseMic() {
   st.mic?.getTracks().forEach((t) => t.stop());
   st.mic = null;
+  st.audioAfterMic = false;
   try {
     if (navigator.audioSession) navigator.audioSession.type = 'auto';
   } catch {}
 }
 
-export function playTone(freq, ms = 1400) {
-  const ctx = audioCtx();
+// freq: a number, or a function of seconds (0..ms/1000) for sliding notes.
+export function playTone(freq, ms = 1400, ctx = audioCtx()) {
   if (!ctx) return Promise.resolve();
   const t0 = ctx.currentTime + 0.02;
   const osc = ctx.createOscillator();
   const gain = ctx.createGain();
   osc.type = 'triangle';
-  osc.frequency.value = freq;
+  if (typeof freq === 'function') {
+    const n = Math.max(32, Math.round(ms / 10));
+    const curve = new Float32Array(n);
+    for (let i = 0; i < n; i++) curve[i] = freq((i / (n - 1)) * (ms / 1000));
+    osc.frequency.setValueCurveAtTime(curve, t0, ms / 1000);
+  } else osc.frequency.value = freq;
   gain.gain.setValueAtTime(0, t0);
   gain.gain.linearRampToValueAtTime(0.6, t0 + 0.05);
   gain.gain.setValueAtTime(0.6, t0 + ms / 1000 - 0.15);
@@ -170,12 +193,16 @@ export function playTone(freq, ms = 1400) {
   return new Promise((r) => setTimeout(r, ms + 80));
 }
 
-export function pitchTracker(stream) {
-  const ctx = audioCtx();
+export function pitchTracker(stream, ctx = audioCtx()) {
   const src = ctx.createMediaStreamSource(stream);
   const analyser = ctx.createAnalyser();
   analyser.fftSize = 2048;
+  // Safari only processes nodes that lead to the speakers, so route the
+  // analyser into a muted gain node connected to the output.
+  const mute = ctx.createGain();
+  mute.gain.value = 0;
   src.connect(analyser);
+  analyser.connect(mute).connect(ctx.destination);
   const buf = new Float32Array(analyser.fftSize);
   return {
     read() {
@@ -183,7 +210,11 @@ export function pitchTracker(stream) {
       return detectPitch(buf, ctx.sampleRate);
     },
     stop() {
-      src.disconnect();
+      try {
+        src.disconnect();
+        analyser.disconnect();
+        mute.disconnect();
+      } catch {}
     },
   };
 }
@@ -194,7 +225,7 @@ export function detectPitch(buf, sampleRate) {
   let rms = 0;
   for (let i = 0; i < n; i++) rms += buf[i] * buf[i];
   rms = Math.sqrt(rms / n);
-  if (rms < 0.008) return { freq: null, rms };
+  if (rms < 0.003) return { freq: null, rms };
   const minLag = Math.floor(sampleRate / 1100);
   const maxLag = Math.min(n - 1, Math.ceil(sampleRate / 65));
   const c = new Float32Array(maxLag + 2);
@@ -213,7 +244,7 @@ export function detectPitch(buf, sampleRate) {
       pos = i;
     }
   }
-  if (pos <= 0 || best < c[0] * 0.3) return { freq: null, rms };
+  if (pos <= 0 || best < c[0] * 0.25) return { freq: null, rms };
   const x1 = c[pos - 1];
   const x2 = c[pos];
   const x3 = c[pos + 1];
@@ -240,25 +271,62 @@ export function recorderMime() {
 
 // ---- camera ---------------------------------------------------------------
 
-// Shrink a camera photo so it uploads quickly over cell data.
+// Shrink a camera photo so it uploads quickly over cell data. Big iPhone
+// photos sometimes come out of the canvas blank (the image wasn't fully
+// decoded yet), so we check and retry smaller before giving up.
 export async function shrinkImage(file, max = 960, quality = 0.75) {
-  const url = URL.createObjectURL(file);
+  for (const size of [max, 720, 480]) {
+    const out = await drawShrunk(file, size, quality).catch(() => null);
+    if (out) return out;
+  }
+  throw new Error('Could not process that photo. Try taking it again?');
+}
+
+async function drawShrunk(file, max, quality) {
+  let source;
+  let w;
+  let hgt;
+  let cleanup = () => {};
+  if (typeof createImageBitmap === 'function') {
+    try {
+      source = await createImageBitmap(file, { imageOrientation: 'from-image' });
+      w = source.width;
+      hgt = source.height;
+      cleanup = () => source.close?.();
+    } catch {
+      source = null;
+    }
+  }
+  if (!source) {
+    const url = URL.createObjectURL(file);
+    cleanup = () => URL.revokeObjectURL(url);
+    source = new Image();
+    source.src = url;
+    await source.decode();
+    w = source.naturalWidth;
+    hgt = source.naturalHeight;
+  }
   try {
-    const img = await new Promise((resolve, reject) => {
-      const i = new Image();
-      i.onload = () => resolve(i);
-      i.onerror = () => reject(new Error('Could not read that image.'));
-      i.src = url;
-    });
-    const scale = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
+    if (!w || !hgt) return null;
+    const scale = Math.min(1, max / Math.max(w, hgt));
     const canvas = document.createElement('canvas');
-    canvas.width = Math.round(img.naturalWidth * scale);
-    canvas.height = Math.round(img.naturalHeight * scale);
-    canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+    canvas.width = Math.round(w * scale);
+    canvas.height = Math.round(hgt * scale);
+    const g = canvas.getContext('2d');
+    g.drawImage(source, 0, 0, canvas.width, canvas.height);
+    if (isBlank(g, canvas.width, canvas.height)) return null;
     return canvas.toDataURL('image/jpeg', quality);
   } finally {
-    URL.revokeObjectURL(url);
+    cleanup();
   }
+}
+
+// True if nothing got drawn (every sampled pixel is fully transparent).
+function isBlank(g, w, hgt) {
+  const data = g.getImageData(0, 0, w, hgt).data;
+  const step = Math.max(4, Math.floor(data.length / 4 / 400)) * 4;
+  for (let i = 3; i < data.length; i += step) if (data[i] !== 0) return false;
+  return true;
 }
 
 export function blobToDataUrl(blob) {

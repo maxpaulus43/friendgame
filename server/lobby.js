@@ -58,6 +58,8 @@ export class Lobby {
         }
         if (room && room !== target) room.disconnect(ws);
         target.join(pid, name, cleanAvatar(msg.avatar), ws);
+        // The host's phone remembers their favorite settings between weeks.
+        if (msg.t === 'create' && msg.settings) target.setSettings(msg.settings);
         send(ws, { t: 'joined', code: target.code });
         return;
       }

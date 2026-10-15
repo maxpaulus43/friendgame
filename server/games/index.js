@@ -6,10 +6,14 @@ import homing from './homing.js';
 import bomb from './bomb.js';
 import hottakes from './hottakes.js';
 import mostlikely from './mostlikely.js';
-import pitch from './pitch.js';
+import pitch, { siren } from './pitch.js';
 import countup from './countup.js';
+import imposter from './imposter.js';
+import twotruths from './twotruths.js';
+import spectrum from './spectrum.js';
+import telephone from './telephone.js';
 
-const all = [snap, shake, hottakes, bomb, sound, homing, mostlikely, pitch, countup];
+const all = [imposter, snap, shake, spectrum, telephone, hottakes, bomb, twotruths, sound, homing, mostlikely, pitch, siren, countup];
 
 export const GAMES = Object.fromEntries(all.map((g) => [g.id, g]));
 
@@ -25,16 +29,53 @@ export const catalog = all.map(({ id, name, emoji, tags, sensors, needs, blurb, 
   minPlayers,
 }));
 
-// A full Wednesday: a mix of laughing, competing, arguing and teaming up.
-const NIGHT_SHAPE = ['compete', 'laugh', 'team', 'argue', 'compete', 'laugh', 'argue', 'team'];
+// How many rounds of each game a night includes, until the host changes it.
+// 0 = left out of the night (still playable on its own from the lobby).
+const DEFAULT_ROUNDS = {
+  snap: 1,
+  shake: 1,
+  hottakes: 1,
+  bomb: 1,
+  sound: 0,
+  homing: 0,
+  mostlikely: 1,
+  pitch: 0,
+  siren: 1,
+  countup: 0,
+  imposter: 2,
+  twotruths: 1,
+  spectrum: 1,
+  telephone: 1,
+};
 
-export function buildNight(playerCount) {
-  const pool = shuffle(all.filter((g) => g.minPlayers <= playerCount));
-  const list = [];
-  for (const vibe of NIGHT_SHAPE) {
-    const g = pool.find((x) => !list.includes(x.id) && x.tags[0] === vibe) ?? pool.find((x) => !list.includes(x.id) && x.tags.includes(vibe));
-    if (g) list.push(g.id);
+export const MAX_ROUNDS = 3;
+
+export function defaultRounds() {
+  return Object.fromEntries(all.map((g) => [g.id, DEFAULT_ROUNDS[g.id] ?? 1]));
+}
+
+export function cleanRounds(input) {
+  const out = defaultRounds();
+  for (const id of Object.keys(out)) {
+    const n = Number(input?.[id]);
+    if (Number.isFinite(n)) out[id] = Math.max(0, Math.min(MAX_ROUNDS, Math.round(n)));
   }
-  for (const g of pool) if (list.length < 7 && !list.includes(g.id)) list.push(g.id);
-  return list.slice(0, 7);
+  return out;
+}
+
+// A full Wednesday: the games with rounds turned on, alternating between
+// laughing, competing, teaming up and arguing. Repeats play back to back.
+const VIBES = ['compete', 'laugh', 'team', 'argue'];
+
+export function buildNight(playerCount, rounds = defaultRounds()) {
+  const pool = shuffle(all.filter((g) => g.minPlayers <= playerCount && (rounds[g.id] ?? 0) > 0));
+  // Spread each vibe evenly across the night: a vibe with k games puts them
+  // at roughly 1/2k, 3/2k, 5/2k… of the way through, with a little jitter.
+  const placed = [];
+  for (const v of [...VIBES, null]) {
+    const games = pool.filter((g) => (v ? g.tags[0] === v : !VIBES.includes(g.tags[0])));
+    games.forEach((g, j) => placed.push({ g, at: (j + 0.5) / games.length + (Math.random() - 0.5) * 0.15 }));
+  }
+  const order = placed.sort((a, b) => a.at - b.at).map((x) => x.g);
+  return order.flatMap((g) => Array(rounds[g.id]).fill(g.id));
 }

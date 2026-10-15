@@ -1,9 +1,10 @@
-import { GAMES, catalog, buildNight } from './games/index.js';
+import { GAMES, catalog, buildNight, defaultRounds, cleanRounds } from './games/index.js';
 import { randomId, pick, UserError } from './util.js';
 
 export { UserError };
 
 const MAX_PLAYERS = 16;
+const REPEAT_INTRO_MS = 8000;
 const MAX_MEDIA_BYTES = 60 * 1024 * 1024;
 
 // One play-through of a single mini-game. Games get this object and use it to
@@ -132,6 +133,7 @@ export class Room {
     this.lastActive = Date.now();
     this.used = new Map();
     this.closed = false;
+    this.settings = { rounds: defaultRounds() };
   }
 
   // ---- membership ----------------------------------------------------------
@@ -247,6 +249,7 @@ export class Room {
         ready: [...r.ready],
         participants: r.playerIds(),
         points: r.points,
+        repeat: r.repeat,
         view,
       };
     }
@@ -265,7 +268,8 @@ export class Room {
           score: p.score,
           connected: p.connected,
         })),
-        night: this.night ? { i: this.night.i, total: this.night.list.length, list: this.night.list } : null,
+        night: this.night ? { i: this.night.i, total: this.night.list.length, list: this.night.list, kind: this.night.kind } : null,
+        settings: this.settings,
         round: roundView,
         final: this.final,
         catalog,
@@ -275,23 +279,54 @@ export class Room {
 
   // ---- game flow -----------------------------------------------------------
 
+  // A full night: every game with rounds turned on, mixed by vibe. Scores reset.
   startNight() {
-    const list = buildNight(this.connectedIds().length);
+    const list = buildNight(this.connectedIds().length, this.settings.rounds);
+    if (!list.length) throw new UserError('Turn on at least one game in the settings.');
     for (const p of this.players.values()) p.score = 0;
-    this.night = { list, i: 0 };
-    this.startRound(list[0]);
+    this.night = { list, i: 0, kind: 'night' };
+    this.startQueued();
   }
 
-  startRound(gameId) {
+  // Just one game, played as many rounds as the settings say.
+  startSeries(gameId) {
+    const game = GAMES[gameId];
+    if (!game) throw new UserError('Unknown game.');
+    const n = Math.max(1, this.settings.rounds[gameId] || 1);
+    this.night = { list: Array(n).fill(gameId), i: 0, kind: 'series' };
+    this.startQueued();
+  }
+
+  startQueued() {
+    const { list, i } = this.night;
+    const gameId = list[i];
+    let start = i;
+    while (start > 0 && list[start - 1] === gameId) start--;
+    let end = i;
+    while (end + 1 < list.length && list[end + 1] === gameId) end++;
+    const repeat = end > start ? { k: i - start + 1, of: end - start + 1 } : null;
+    this.startRound(gameId, repeat);
+  }
+
+  startRound(gameId, repeat = null) {
     const game = GAMES[gameId];
     if (!game) throw new UserError('Unknown game.');
     const count = this.connectedIds().length;
     if (count < game.minPlayers) throw new UserError(`${game.name} needs at least ${game.minPlayers} players.`);
     this.round?.clearTimers();
     this.clearMedia();
-    this.round = new Round(this, gameId, ++this.seq);
+    const r = new Round(this, gameId, ++this.seq);
+    r.repeat = repeat;
+    this.round = r;
     this.phase = 'round';
     this.final = null;
+    // Second and later rounds of the same game start on their own: everyone
+    // already knows the rules and has granted permissions.
+    if (repeat && repeat.k > 1) {
+      r.deadline = Date.now() + REPEAT_INTRO_MS;
+      r.onTimeout = () => this.begin();
+      r.after(REPEAT_INTRO_MS, r.onTimeout);
+    }
     this.touch();
   }
 
@@ -312,6 +347,9 @@ export class Room {
   begin() {
     const r = this.round;
     if (!r || r.step !== 'intro') return;
+    r.clearTimers();
+    r.deadline = null;
+    r.onTimeout = null;
     r.step = 'starting';
     try {
       r.game.start(r);
@@ -337,13 +375,37 @@ export class Room {
   next() {
     const r = this.round;
     if (!r || r.step !== 'results') return;
-    if (this.night) {
-      this.night.i++;
-      if (this.night.i < this.night.list.length) return this.startRound(this.night.list[this.night.i]);
-      return this.finishNight();
+    this.advance(this.night ? this.night.i + 1 : 0);
+  }
+
+  // Abandon the current game (and any more rounds of it) and move on.
+  skipGame() {
+    const r = this.round;
+    if (!r) return;
+    r.clearTimers();
+    if (!this.night) return this.endRound();
+    let i = this.night.i;
+    while (i < this.night.list.length && this.night.list[i] === r.gameId) i++;
+    this.advance(i);
+  }
+
+  advance(i) {
+    if (this.night && i < this.night.list.length) {
+      this.night.i = i;
+      try {
+        return this.startQueued();
+      } catch (err) {
+        // e.g. someone left and a game no longer has enough players.
+        if (!(err instanceof UserError)) throw err;
+        return this.advance(i + 1);
+      }
     }
+    if (this.night?.kind === 'night') return this.finishNight();
+    this.round?.clearTimers();
     this.round = null;
+    this.night = null;
     this.phase = 'lobby';
+    this.clearMedia();
     this.touch();
   }
 
@@ -375,10 +437,13 @@ export class Room {
     switch (msg.action) {
       case 'start':
         if (msg.game === 'night') this.startNight();
-        else {
-          this.night = null;
-          this.startRound(msg.game);
-        }
+        else this.startSeries(msg.game);
+        break;
+      case 'skipGame':
+        this.skipGame();
+        break;
+      case 'settings':
+        this.setSettings(msg.settings);
         break;
       case 'begin':
         if (this.round?.step === 'intro') this.begin();
@@ -415,6 +480,11 @@ export class Room {
     const r = this.round;
     if (!r || r.step === 'results') return;
     r.game.action(r, pid, msg);
+  }
+
+  setSettings(settings) {
+    if (settings?.rounds) this.settings = { ...this.settings, rounds: cleanRounds(settings.rounds) };
+    this.touch();
   }
 
   // ---- misc ----------------------------------------------------------------

@@ -13,18 +13,33 @@ compass and GPS.
 
 | | Game | Vibe | Uses | What happens |
 |---|---|---|---|---|
+| 🕵️ | **Imposter** | argue · laugh | – | Everyone sees a category and a secret word, except one imposter who doesn't. Each person says one word on the call, then everyone votes. If the imposter is caught, they can still win by guessing the word. |
+| 🤥 | **Two Truths & a Lie** | argue · laugh | – | Write two true things and one lie about yourself. Everyone gets grilled in turn, then the others guess the lie. |
+| 🎚️ | **Spectrum** | team · argue | – | One person sees a secret spot on a scale (Cold ↔ Hot) and types a clue. Everyone else argues about where it lands. Everyone takes a turn giving the clue. |
+| 🖍️ | **Doodle Telephone** | laugh | touch drawing | Write a phrase, draw someone else's, guess someone's drawing, and keep passing it around the circle. Then flip through every chain together. |
 | 📸 | **Snap Judgment** | laugh · compete | camera | Everyone gets the same prompt ("the saddest thing in your fridge"), snaps a photo, then votes on the anonymous photos. |
 | 🎙️ | **Sound Off** | laugh | mic | Record a 6-second sound effect ("a dolphin ordering at a drive-thru"). Everyone listens to the clips and votes. |
 | 🫨 | **Shake Down** | compete | accelerometer | 10 seconds to shake your phone harder than anyone else, with live bars for everyone. |
 | 🧭 | **Homing Pigeon** | compete · laugh | compass + GPS | Point your phone at your friends' houses across the state, plus a few world landmarks. The game tells you how many miles you'd have missed by. |
-| 💣 | **Bomb Squad** | team | gyroscope | Everyone tilts their phone to hold a ball inside a target ring. The fuse only burns down while *all* of you are in your rings at once. Three wires, and the last ring moves. |
+| 💣 | **Bomb Squad** | team | gyroscope | Everyone tilts their phone to hold a sliding ball inside a target ring. A wire is only cut while *all* of you are in your rings at once. Four wires: the rings start drifting, then sparks fly that knock your ball away. |
 | 🌶️ | **Hot Takes** | argue | – | Rate a spicy statement from 0 to 10. The answers are revealed and the extremes get called out to defend themselves. Then everyone re-rates, and you score points for pulling people toward your take. |
 | 👉 | **Most Likely To** | argue · laugh | – | "Who's most likely to fight a goose and lose?" Votes are shown with names attached. |
 | 🎶 | **Pitch Imperfect** | compete · laugh | mic + speaker | The phone plays a note, you sing it back, and the phone scores you (any octave counts). |
+| 🚨 | **Siren Song** | compete · laugh | mic + speaker | Hard-mode Pitch Imperfect: follow a pitch that slides, jumps and wobbles while your voice is drawn live on screen. |
 | 🔢 | **Count Up** | team · laugh | – | Count to the target as a group, one tap at a time. If two people tap at the same moment, the count goes back to zero. |
 
-**Start the Night** plays 7 rounds that mix all four vibes, then crowns the
-Wednesday Champion. The host can also pick a single game from the lobby.
+**Start the Night** plays the lineup set in the lobby, with each vibe spread
+evenly across the night, then crowns the Wednesday Champion. The host chooses
+how many rounds of each game to include (0–3, where 0 leaves it out). The
+host's phone remembers the lineup for next week. Repeat rounds of the same game
+play back to back and start on their own after a short countdown. Tap
+**▶ Play** on any game to play just that game.
+
+During a round the host has three buttons:
+- **Skip timer** moves on from the current step.
+- **Skip game** (or **Next game**) drops the rest of the current game and
+  goes to the next one.
+- **End** goes back to the lobby.
 
 ## How a game night works
 
@@ -35,7 +50,7 @@ Wednesday Champion. The host can also pick a single game from the lobby.
 
 > **Run the call on a laptop, tablet or TV if you can.** iPhones won't let a
 > web page use the mic or camera while a FaceTime/phone call is using them,
-> so the Sound Off and Pitch Imperfect rounds work best when the phone is
+> so the Sound Off, Pitch Imperfect and Siren Song rounds work best when the phone is
 > only running the game. The game rounds still work if you're on speaker,
 > but the mic rounds will complain.
 
@@ -98,13 +113,16 @@ gives you a temporary https URL.
   kept in server memory only for the current round and are deleted when the
   next round starts. Locations are rounded to about 1 km, used only for
   Homing Pigeon, and never shown to other players.
+- Drawings from Doodle Telephone are uploaded as small JPEGs and kept only for
+  that round, the same as photos.
 
 ### Adding a new game
 
 1. Create `server/games/mygame.js` exporting `{ id, name, emoji, tags, sensors, needs, blurb, howTo, minPlayers, start(r), action(r, pid, msg), view(r, pid), check?(r) }`.
+   The first tag decides where the game lands in a night (`compete`, `laugh`, `team` or `argue`).
    Use `r.setStep(name, ms, onTimeout)` to move through steps and
    `r.finish(points)` to end the round.
-2. Register it in `server/games/index.js`.
+2. Register it in `server/games/index.js`, and set its default round count in `DEFAULT_ROUNDS`.
 3. Create `public/js/games/mygame.js` exporting `{ mount(el, ctx) → { update(view, ctx), unmount() }, results(view, ctx), prepare?(ctx) }`
    and register it in `public/js/app.js`.
 4. Add a test to `test/games.test.js`.

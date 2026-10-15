@@ -1,11 +1,13 @@
 import { rand } from '../util.js';
 
-const TOTAL_MS = 75_000;
-const HOLD_MS = 2500;
+const TOTAL_MS = 100_000;
+const HOLD_MS = 3000;
+// Each wire is harder: smaller rings that drift faster, then sparks to dodge.
 const STAGES = [
-  { r: 0.3, drift: 0 },
-  { r: 0.24, drift: 0 },
-  { r: 0.2, drift: 0.22 },
+  { r: 0.28, drift: 0, speed: 0, sparks: 0 },
+  { r: 0.24, drift: 0.28, speed: 1, sparks: 0 },
+  { r: 0.22, drift: 0.32, speed: 1.6, sparks: 2 },
+  { r: 0.2, drift: 0.38, speed: 2.2, sparks: 3 },
 ];
 
 export default {
@@ -17,9 +19,9 @@ export default {
   needs: ['motion', 'orientation'],
   blurb: 'Everyone tilts their phone to hold a ball in a target. All of you, at the same time, or it goes boom.',
   howTo: [
-    'Hold your phone flat like a tray. Tilt it to roll the ball into your ring.',
-    'The fuse only burns down while EVERYONE is in their ring at once.',
-    'Three wires to cut. The last ring moves. Yelling at each other is encouraged.',
+    'Hold your phone flat like a tray. Tilt to roll the ball into your ring. It slides, so be gentle.',
+    'A wire only gets cut while EVERYONE is in their ring at once, for 3 seconds straight.',
+    'Four wires. The rings start moving, then sparks fly. A spark knocks your ball away. Yell at each other.',
   ],
   minPlayers: 1,
   start(r) {
@@ -58,7 +60,7 @@ function newStage(r) {
   r.data.holdMs = 0;
   for (const pid of r.playerIds()) {
     const lim = 0.62 - s.r;
-    r.data.targets.set(pid, { x: rand(-lim, lim), y: rand(-lim, lim), r: s.r, drift: s.drift, seed: Math.random() * 1000 });
+    r.data.targets.set(pid, { x: rand(-lim, lim), y: rand(-lim, lim), r: s.r, drift: s.drift, speed: s.speed, sparks: s.sparks, seed: Math.random() * 1000 });
   }
   r.touch();
 }
@@ -68,7 +70,7 @@ function tick(r) {
   const active = r.activeIds();
   const allIn = active.length > 0 && active.every((id) => d.status.get(id));
   const before = d.holdMs;
-  d.holdMs = allIn ? d.holdMs + 100 : Math.max(0, d.holdMs - 250);
+  d.holdMs = allIn ? d.holdMs + 100 : Math.max(0, d.holdMs - 400);
   if (d.holdMs >= HOLD_MS) {
     d.stage++;
     if (d.stage >= STAGES.length) return end(r, true);
@@ -79,6 +81,6 @@ function tick(r) {
 function end(r, success) {
   r.data.outcome = success ? 'defused' : 'boom';
   const points = {};
-  for (const pid of r.playerIds()) points[pid] = success ? 250 : 60 * r.data.stage;
+  for (const pid of r.playerIds()) points[pid] = success ? 300 : 60 * r.data.stage;
   r.finish(points);
 }
