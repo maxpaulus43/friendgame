@@ -1,6 +1,7 @@
 import { h, replace, card, doneRow, toast } from '../ui.js';
 import { drawingPad } from '../draw.js';
 import { photo } from './mediavote.js';
+import * as net from '../net.js';
 
 const AUTO_SUBMIT_MS = 1500; // send whatever you have just before time runs out
 
@@ -26,6 +27,7 @@ export default {
 
     let submitted = v.submitted;
     let sending = false;
+    let stopSending = null;
     const status = h('div');
     const doneMsg = h('div', { class: 'card center hidden' }, h('div', { class: 'intro-emoji' }, '📨'), h('p', {}, 'Passed along! Waiting for everyone else.'));
     let getPayload;
@@ -72,12 +74,8 @@ export default {
       sending = true;
       sendBtn.disabled = true;
       sendBtn.textContent = 'Sending…';
-      if (!c.send('submit', payload)) {
-        sending = false;
-        sendBtn.disabled = false;
-        sendBtn.textContent = 'Try again';
-        toast('Reconnecting… try again in a sec.');
-      }
+      // Keep re-sending until the server confirms, in case the connection dropped.
+      stopSending = net.sendUntil({ t: 'g', a: 'submit', ...payload }, () => submitted, 5000, 120_000);
     };
 
     const head = h('div', { class: 'small muted center' }, `Step ${v.hop + 1} of ${v.hops}`);
@@ -106,6 +104,7 @@ export default {
       },
       unmount() {
         clearInterval(autoTimer);
+        stopSending?.();
       },
     };
   },

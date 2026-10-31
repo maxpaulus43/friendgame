@@ -1,4 +1,5 @@
 import { shuffle, pick } from '../util.js';
+import categories from '../prompts/imposter.js';
 
 const CLUE_MS_PER_PLAYER = 20_000;
 const VOTE_MS = 40_000;
@@ -6,27 +7,6 @@ const REVEAL_MS = 12_000;
 const GUESS_MS = 30_000;
 
 // Everyone sees the category. Everyone but the imposter sees the secret word.
-const categories = [
-  { name: 'Pizza toppings', words: ['Pepperoni', 'Pineapple', 'Mushroom', 'Olives', 'Sausage', 'Anchovies', 'Jalapeño', 'Onion'] },
-  { name: 'Zoo animals', words: ['Giraffe', 'Penguin', 'Gorilla', 'Flamingo', 'Lion', 'Elephant', 'Zebra', 'Hippo'] },
-  { name: 'Things in a kitchen', words: ['Toaster', 'Blender', 'Spatula', 'Fridge', 'Microwave', 'Kettle', 'Colander', 'Oven mitt'] },
-  { name: 'Sports', words: ['Golf', 'Hockey', 'Tennis', 'Surfing', 'Bowling', 'Boxing', 'Baseball', 'Curling'] },
-  { name: 'Jobs', words: ['Dentist', 'Pilot', 'Firefighter', 'Librarian', 'Chef', 'Plumber', 'Lifeguard', 'Magician'] },
-  { name: 'Vacation spots', words: ['Beach', 'Ski resort', 'Cruise ship', 'Camping', 'Las Vegas', 'Disneyland', 'Paris', 'Road trip'] },
-  { name: 'Things at a wedding', words: ['Cake', 'Bouquet', 'Ring', 'DJ', 'Veil', 'Toast', 'Limo', 'Open bar'] },
-  { name: 'Board games', words: ['Monopoly', 'Chess', 'Scrabble', 'Clue', 'Jenga', 'Risk', 'Catan', 'Twister'] },
-  { name: 'Breakfast foods', words: ['Pancakes', 'Bacon', 'Oatmeal', 'Waffles', 'Burrito', 'Bagel', 'Cereal', 'Omelette'] },
-  { name: 'Things in a bathroom', words: ['Toothbrush', 'Plunger', 'Bathtub', 'Mirror', 'Shower curtain', 'Scale', 'Hair dryer', 'Rubber duck'] },
-  { name: 'Superpowers', words: ['Flying', 'Invisibility', 'Time travel', 'Mind reading', 'Teleporting', 'Super strength', 'Healing', 'Shapeshifting'] },
-  { name: 'Things you take camping', words: ['Tent', 'Flashlight', 'Marshmallows', 'Bug spray', 'Sleeping bag', 'Cooler', 'Hatchet', 'Lantern'] },
-  { name: 'Halloween costumes', words: ['Vampire', 'Pirate', 'Witch', 'Zombie', 'Ghost', 'Mummy', 'Skeleton', 'Werewolf'] },
-  { name: 'Musical instruments', words: ['Guitar', 'Drums', 'Violin', 'Tuba', 'Piano', 'Harmonica', 'Banjo', 'Saxophone'] },
-  { name: 'Things in an office', words: ['Stapler', 'Printer', 'Whiteboard', 'Coffee machine', 'Swivel chair', 'Paper clip', 'Cubicle', 'Water cooler'] },
-  { name: 'Fast food orders', words: ['Burger', 'Fries', 'Milkshake', 'Chicken nuggets', 'Taco', 'Hot dog', 'Onion rings', 'Soda'] },
-  { name: 'Weather', words: ['Tornado', 'Snowstorm', 'Heat wave', 'Fog', 'Hail', 'Thunderstorm', 'Drizzle', 'Rainbow'] },
-  { name: 'Things at the beach', words: ['Sunscreen', 'Seagull', 'Sandcastle', 'Umbrella', 'Surfboard', 'Crab', 'Lifeguard tower', 'Volleyball'] },
-];
-
 export default {
   id: 'imposter',
   name: 'Imposter',

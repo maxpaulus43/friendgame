@@ -100,6 +100,7 @@ async function startGame(bots, game) {
 }
 
 const points = (bot) => bot.round.points;
+const fakeJpeg = () => 'data:image/jpeg;base64,' + Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(200, 7)]).toString('base64');
 const closeAll = (bots) => bots.forEach((b) => b.close());
 
 test('shake: biggest shaker wins', async () => {
@@ -172,7 +173,7 @@ test('count up: collisions reset, reaching target wins', async () => {
 test('snap judgment: upload, vote, media served with ranges', async () => {
   const bots = await makeRoom();
   await startGame(bots, 'snap');
-  const jpeg = 'data:image/jpeg;base64,' + Buffer.from('fake-jpeg-bytes-0123456789').toString('base64');
+  const jpeg = fakeJpeg();
   bots.forEach((b) => b.g('submit', { data: jpeg }));
   await Promise.all(bots.map((b) => b.untilStep('vote')));
   const entries = bots[0].view.entries;
@@ -190,7 +191,35 @@ test('snap judgment: upload, vote, media served with ranges', async () => {
   assert.equal(full.status, 200);
   const part = await fetch(url, { headers: { range: 'bytes=0-3' } });
   assert.equal(part.status, 206);
-  assert.equal(await part.text(), 'fake');
+  assert.deepEqual([...new Uint8Array(await part.arrayBuffer())], [0xff, 0xd8, 0xff, 0xe0]);
+  // The socket fallback hands back the same photo.
+  const id = bots[0].view.entries[0].id;
+  const got = new Promise((resolve) => bots[0].ws.on('message', (raw) => { const m = JSON.parse(raw); if (m.t === 'media') resolve(m); }));
+  bots[0].send({ t: 'media', id });
+  assert.ok((await got).data.startsWith('data:image/jpeg;base64,/9j/'));
+  closeAll(bots);
+});
+
+test('snap judgment: re-sent uploads count once, broken ones are refused, late ones still count', async () => {
+  const bots = await makeRoom();
+  await startGame(bots, 'snap');
+  // A broken file is refused with a code the phone uses to stop re-sending.
+  bots[0].g('submit', { data: 'data:image/jpeg;base64,' + Buffer.from('not a jpeg at all, just text!').toString('base64'), uploadId: 'x' });
+  await bots[0].until(() => bots[0].errors.length > 0, 'error');
+  assert.match(bots[0].errors[0], /broken/);
+  // The same upload sent twice (after a reconnect) is stored once.
+  bots[0].g('submit', { data: fakeJpeg(), uploadId: 'u1' });
+  bots[0].g('submit', { data: fakeJpeg(), uploadId: 'u1' });
+  bots[1].g('submit', { data: fakeJpeg(), uploadId: 'u2' });
+  await bots[0].until((s) => s.round.view.mineUpload === 'u1', 'upload confirmed');
+  // Host skips the timer while Cat's photo is still on its way…
+  bots[0].host('skip');
+  await bots[0].untilStep('vote');
+  assert.equal(bots[0].view.entries.length, 2);
+  // …and it shows up in the vote list when it lands.
+  bots[2].g('submit', { data: fakeJpeg(), uploadId: 'u3' });
+  await bots[0].until((s) => s.round.view.entries.length === 3, 'late photo added');
+  await bots[2].until((s) => s.round.view.mineUpload === 'u3' && s.round.view.entries.some((e) => e.mine), 'late uploader sees theirs');
   closeAll(bots);
 });
 
@@ -394,8 +423,7 @@ test('doodle telephone: write, draw, guess, then flip through the album', async 
     await b.untilStep('draw');
     assert.ok(b.view.prev.text.endsWith("'s phrase") && !b.view.prev.text.startsWith(b.name));
   }
-  const png = 'data:image/jpeg;base64,' + Buffer.from('drawing').toString('base64');
-  bots.forEach((b) => b.g('submit', { data: png }));
+  bots.forEach((b) => b.g('submit', { data: fakeJpeg() }));
   await bots[0].untilStep('guess');
   for (const b of bots) await b.untilStep('guess');
   assert.ok(bots[1].view.prev.url.startsWith('/media/'));
@@ -453,4 +481,35 @@ test('unknown room code is a friendly error', async () => {
   await new Promise((r) => setTimeout(r, 200));
   assert.match(b.errors[0], /No room/);
   b.close();
+});
+
+test('one night werewolf: a full game with random roles', async () => {
+  const bots = await makeRoom(4);
+  await startGame(bots, 'werewolf');
+  await Promise.all(bots.map((b) => b.untilStep('night')));
+  const others = (b) => bots.filter((x) => x !== b).map((x) => x.pid);
+  for (const b of bots) {
+    const v = b.view;
+    assert.ok(v.role && v.roles[v.role], 'everyone has a role');
+    if (v.role === 'seer') b.g('night', { centers: [0, 2] });
+    else if (v.role === 'robber') b.g('night', { player: others(b)[0] });
+    else if (v.role === 'troublemaker') b.g('night', { players: others(b).slice(0, 2) });
+    else if (v.role === 'drunk' || (v.role === 'werewolf' && v.loneWolf)) b.g('night', { center: 1 });
+    else b.g('night', {});
+  }
+  await bots[0].untilStep('day');
+  // Nobody can see anyone else's role during the day.
+  assert.ok(!JSON.stringify(bots[0].view).includes(bots[1].pid + '":"'));
+  bots.forEach((b) => b.g('ready'));
+  await bots[0].untilStep('vote');
+  bots.forEach((b, i) => b.g('vote', { pid: bots[(i + 1) % 4 === 0 ? 1 : 0].pid === b.pid ? bots[2].pid : bots[0].pid }));
+  await bots[0].untilStep('results');
+  const res = bots[0].view.result;
+  assert.equal(res.players.length, 4);
+  // Every card is still somewhere: players + center is the same deck as before.
+  const before = [...res.players.map((p) => p.original), ...res.center].sort();
+  const after = [...res.players.map((p) => p.final), ...res.finalCenter].sort();
+  assert.deepEqual(after, before);
+  assert.ok(res.headline);
+  closeAll(bots);
 });

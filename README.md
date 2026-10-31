@@ -13,10 +13,11 @@ compass and GPS.
 
 | | Game | Vibe | Uses | What happens |
 |---|---|---|---|---|
+| 🐺 | **One Night Werewolf** | argue · laugh | – | Secret roles (Werewolf, Seer, Robber, Troublemaker, Drunk, Insomniac, Minion, Tanner, Masons). Everyone does their night action privately at the same time, swaps resolve in the classic order, then you argue it out and vote once. The full reveal shows who was who and every swap. |
 | 🕵️ | **Imposter** | argue · laugh | – | Everyone sees a category and a secret word, except one imposter who doesn't. Each person says one word on the call, then everyone votes. If the imposter is caught, they can still win by guessing the word. |
 | 🤥 | **Two Truths & a Lie** | argue · laugh | – | Write two true things and one lie about yourself. Everyone gets grilled in turn, then the others guess the lie. |
 | 🎚️ | **Spectrum** | team · argue | – | One person sees a secret spot on a scale (Cold ↔ Hot) and types a clue. Everyone else argues about where it lands. Everyone takes a turn giving the clue. |
-| 🖍️ | **Doodle Telephone** | laugh | touch drawing | Write a phrase, draw someone else's, guess someone's drawing, and keep passing it around the circle. Then flip through every chain together. |
+| 🖍️ | **Doodle Telephone** | laugh | touch drawing | Write a phrase, draw someone else's, guess someone's drawing, and keep passing it around the circle. Then flip through every chain together. The drawing pad has colors, skin tones, three brush sizes, a paint bucket, undo and clear. |
 | 📸 | **Snap Judgment** | laugh · compete | camera | Everyone gets the same prompt ("the saddest thing in your fridge"), snaps a photo, then votes on the anonymous photos. |
 | 🎙️ | **Sound Off** | laugh | mic | Record a 6-second sound effect ("a dolphin ordering at a drive-thru"). Everyone listens to the clips and votes. |
 | 🫨 | **Shake Down** | compete | accelerometer | 10 seconds to shake your phone harder than anyone else, with live bars for everyone. |
@@ -109,6 +110,13 @@ gives you a temporary https URL.
   `server/games/<id>.js`, and the phone UI is in `public/js/games/<id>.js`.
 - **Hardware access** (with all the iOS permission quirks) is in
   `public/js/sensors.js`.
+- **Connections that come back to life.** After Safari has been in the
+  background (for example while the camera is open), iOS can leave the
+  connection looking open when it's actually dead. `public/js/net.js` pings
+  whenever the page comes back and reconnects if there's no answer. Photos,
+  clips and drawings keep re-sending until the server confirms it has them.
+  Photos download with a timeout and retries, and fall back to coming over the
+  game connection if the normal download keeps failing.
 - Photos are shrunk on the phone before uploading. Photos and voice clips are
   kept in server memory only for the current round and are deleted when the
   next round starts. Locations are rounded to about 1 km, used only for
@@ -127,5 +135,8 @@ gives you a temporary https URL.
    and register it in `public/js/app.js`.
 4. Add a test to `test/games.test.js`.
 
-Prompts for every game are plain arrays at the top of each server file. Add
-your group's inside jokes.
+Prompts for every game live in `server/prompts/`, one file per game (Hot
+Takes statements, Most Likely To questions, photo and sound prompts, Imposter
+categories, Spectrum scales, drawing starters, Homing Pigeon landmarks). They're
+plain lists, so it's easy to add your group's inside jokes. Within a room, each
+prompt is used once before any repeats.

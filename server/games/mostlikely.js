@@ -1,37 +1,10 @@
+import prompts from '../prompts/mostlikely.js';
+
 const VOTE_MS = 25_000;
 const REVEAL_MS = 12_000;
 const QUESTIONS = 3;
 const MAJORITY_POINTS = 60;
 const TITLE_POINTS = 20;
-
-const prompts = [
-  'survive the longest in a zombie apocalypse',
-  'accidentally join a cult',
-  'become famous for something embarrassing',
-  'cry at a car commercial',
-  'get lost in their own neighborhood',
-  'win a hot dog eating contest',
-  'secretly be a millionaire',
-  'text the wrong person something terrible',
-  'fight a goose and lose',
-  'start a podcast nobody asked for',
-  'get banned from a Costco',
-  'still be awake at 4am tonight',
-  'talk their way out of a speeding ticket',
-  'come home with six cats',
-  'die first in a horror movie',
-  'reply-all to the entire company',
-  'eat something off the floor at a restaurant',
-  'become a reality TV villain',
-  'show up to the wrong wedding',
-  'fake their own death to get out of a group chat',
-  'adopt a hobby, buy all the gear, quit in a week',
-  'befriend a raccoon',
-  'be late to their own funeral',
-  'go viral for a bad review',
-  'have a secret talent nobody knows about',
-  'cause a scene at a kid\'s birthday party',
-];
 
 export default {
   id: 'mostlikely',

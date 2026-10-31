@@ -30,7 +30,7 @@ export class Lobby {
     try {
       this.handle(ws, msg);
     } catch (err) {
-      if (err instanceof UserError) send(ws, { t: 'error', msg: err.message });
+      if (err instanceof UserError) send(ws, { t: 'error', msg: err.message, code: err.code });
       else {
         console.error('message error:', err);
         send(ws, { t: 'error', msg: 'Something went wrong on the server.' });
@@ -79,6 +79,12 @@ export class Lobby {
         return room.hostAction(ws.pid, msg);
       case 'g':
         return room.gameAction(ws.pid, msg);
+      case 'media': {
+        // Fallback for phones whose normal photo download keeps failing.
+        const m = room.media.get(String(msg.id));
+        if (!m || m.buf.length > 3_000_000) return send(ws, { t: 'media', id: msg.id, data: null });
+        return send(ws, { t: 'media', id: msg.id, data: `data:${m.mime};base64,${m.buf.toString('base64')}` });
+      }
     }
   }
 

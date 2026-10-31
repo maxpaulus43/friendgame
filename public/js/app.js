@@ -14,8 +14,9 @@ import imposter from './games/imposter.js';
 import twotruths from './games/twotruths.js';
 import spectrum from './games/spectrum.js';
 import telephone from './games/telephone.js';
+import werewolf from './games/werewolf.js';
 
-const MODULES = { snap, sound, shake, homing, bomb, hottakes, mostlikely, pitch, siren: pitch, countup, imposter, twotruths, spectrum, telephone };
+const MODULES = { snap, sound, shake, homing, bomb, hottakes, mostlikely, pitch, siren: pitch, countup, imposter, twotruths, spectrum, telephone, werewolf };
 
 const AVATARS = ['🦊', '🐸', '🐙', '🦄', '🐔', '🐢', '🦖', '🐼', '🦉', '🐝', '🦀', '🐷', '🐵', '🦩', '🐳', '🦔', '👽', '🤖', '👻', '🤠', '🧙', '🥑', '🌮', '🍕'];
 

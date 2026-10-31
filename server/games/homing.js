@@ -1,27 +1,9 @@
 import { shuffle } from '../util.js';
+import LANDMARKS from '../prompts/landmarks.js';
 
 const POINT_MS = 75_000;
 const TARGETS = 3;
 const EARTH_MI = 3958.8;
-
-const LANDMARKS = [
-  { label: 'the Eiffel Tower', lat: 48.8584, lon: 2.2945 },
-  { label: 'the Statue of Liberty', lat: 40.6892, lon: -74.0445 },
-  { label: 'the Great Pyramid of Giza', lat: 29.9792, lon: 31.1342 },
-  { label: 'the Sydney Opera House', lat: -33.8568, lon: 151.2153 },
-  { label: 'the North Pole', lat: 90, lon: 0 },
-  { label: 'Mount Everest', lat: 27.9881, lon: 86.925 },
-  { label: 'the Golden Gate Bridge', lat: 37.8199, lon: -122.4783 },
-  { label: 'the Taj Mahal', lat: 27.1751, lon: 78.0421 },
-  { label: 'Machu Picchu', lat: -13.1631, lon: -72.545 },
-  { label: 'the White House', lat: 38.8977, lon: -77.0365 },
-  { label: 'Walt Disney World', lat: 28.3772, lon: -81.5707 },
-  { label: 'the Las Vegas Strip', lat: 36.1147, lon: -115.1728 },
-  { label: 'the Grand Canyon', lat: 36.1069, lon: -112.1129 },
-  { label: 'Tokyo Tower', lat: 35.6586, lon: 139.7454 },
-  { label: 'Stonehenge', lat: 51.1789, lon: -1.8262 },
-  { label: 'Mount Rushmore', lat: 43.8791, lon: -103.4591 },
-];
 
 const CARDINALS = [
   { label: 'North', bearing: 0 },

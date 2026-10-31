@@ -1,38 +1,10 @@
 import { shuffle, randInt } from '../util.js';
+import spectrums from '../prompts/spectrum.js';
 
 const CLUE_MS = 60_000;
 const GUESS_MS = 50_000;
 const REVEAL_MS = 12_000;
 const MAX_TURNS = 5;
-
-const spectrums = [
-  ['Cold', 'Hot'],
-  ['Overrated', 'Underrated'],
-  ['Bad movie', 'Good movie'],
-  ['Smells bad', 'Smells good'],
-  ['Useless', 'Useful'],
-  ['Breakfast food', 'Dinner food'],
-  ['Normal pet', 'Weird pet'],
-  ['Tastes bad', 'Tastes good'],
-  ['Sad song', 'Happy song'],
-  ['Villain', 'Hero'],
-  ['For kids', 'For grown-ups'],
-  ['Cheap', 'Expensive'],
-  ['Rare', 'Common'],
-  ['Forgettable', 'Iconic'],
-  ['Unhealthy', 'Healthy'],
-  ['Boring hobby', 'Exciting hobby'],
-  ['Low effort', 'High effort'],
-  ['Trashy', 'Classy'],
-  ['Quiet', 'Loud'],
-  ['Scary', 'Cute'],
-  ['Weird thing to say on a first date', 'Normal thing to say on a first date'],
-  ['Mildly annoying', 'Infuriating'],
-  ['Easy to do drunk', 'Hard to do drunk'],
-  ['Nobody owns one', 'Everybody owns one'],
-  ['Bad superpower', 'Great superpower'],
-  ['Dying trend', 'Here to stay'],
-];
 
 // Points for how close a guess lands to the target (0-100 scale).
 export const closeness = (guess, target) => {

@@ -12,8 +12,9 @@ import imposter from './imposter.js';
 import twotruths from './twotruths.js';
 import spectrum from './spectrum.js';
 import telephone from './telephone.js';
+import werewolf from './werewolf.js';
 
-const all = [imposter, snap, shake, spectrum, telephone, hottakes, bomb, twotruths, sound, homing, mostlikely, pitch, siren, countup];
+const all = [werewolf, imposter, snap, shake, spectrum, telephone, hottakes, bomb, twotruths, sound, homing, mostlikely, pitch, siren, countup];
 
 export const GAMES = Object.fromEntries(all.map((g) => [g.id, g]));
 
@@ -46,6 +47,7 @@ const DEFAULT_ROUNDS = {
   twotruths: 1,
   spectrum: 1,
   telephone: 1,
+  werewolf: 1,
 };
 
 export const MAX_ROUNDS = 3;

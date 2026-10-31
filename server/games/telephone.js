@@ -1,4 +1,6 @@
 import { shuffle, UserError } from '../util.js';
+import { looksLikeImage } from './mediavote.js';
+import starters from '../prompts/telephone.js';
 
 const WRITE_MS = 60_000;
 const DRAW_MS = 90_000;
@@ -6,25 +8,6 @@ const GUESS_MS = 45_000;
 const MAX_HOPS = 8;
 const MAX_TEXT = 100;
 const MAX_IMAGE = 1_500_000;
-
-const starters = [
-  'A cat running for mayor',
-  'Grandma at a rave',
-  'A shark afraid of water',
-  'The world\'s saddest birthday party',
-  'A dog doing taxes',
-  'Aliens visiting a Walmart',
-  'A haunted toaster',
-  'Two snails racing',
-  'A pirate stuck in traffic',
-  'A cowboy riding a giant chicken',
-  'A wizard who lost his wand',
-  'A burrito on vacation',
-  'The moon eating spaghetti',
-  'A very confident potato',
-  'A raccoon stealing a car',
-  'A ghost going to the gym',
-];
 
 // Chains pass along the circle: whoever starts chain c writes, the next
 // person draws it, the next guesses the drawing, and so on.
@@ -56,6 +39,8 @@ export default {
     if (msg.a !== 'submit' || !['write', 'draw', 'guess'].includes(r.step)) return;
     const c = chainFor(r, pid);
     if (c === null) return;
+    // Phones re-send until confirmed; the first copy wins.
+    if (d.chains[c].entries[d.hop]) return;
     const kind = kindOf(d.hop);
     let entry;
     if (kind === 'draw') {
@@ -63,6 +48,7 @@ export default {
       if (!m) throw new UserError('That drawing didn\'t upload. Try again?');
       const buf = Buffer.from(m[2], 'base64');
       if (buf.length > MAX_IMAGE) throw new UserError('That drawing is too big.');
+      if (!looksLikeImage(buf, m[1])) throw new UserError('That drawing came through broken. Try sending it again.');
       entry = { pid, kind, mediaId: r.putMedia(buf, m[1]) };
     } else {
       const text = String(msg.text ?? '').trim().slice(0, MAX_TEXT);

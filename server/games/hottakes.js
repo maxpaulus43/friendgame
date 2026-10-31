@@ -1,41 +1,8 @@
+import statements from '../prompts/hottakes.js';
+
 const RATE_MS = 30_000;
 const DEBATE_MS = 75_000;
 const RERATE_MS = 25_000;
-
-const statements = [
-  'A hot dog is a sandwich.',
-  'Cereal is a soup.',
-  'It\'s fine to recline your seat on a plane.',
-  'Pineapple belongs on pizza.',
-  'Breakfast for dinner beats dinner for dinner.',
-  'Replying "k" is a hostile act.',
-  'Socks with sandals are acceptable.',
-  'Dogs are better than cats.',
-  'Water is wet.',
-  'Die Hard is a Christmas movie.',
-  'Leaving a voicemail in 2026 is rude.',
-  'Ranch goes with everything.',
-  'Toilet paper goes over, not under.',
-  'Showering at night is superior to showering in the morning.',
-  'Mint chocolate chip tastes like toothpaste.',
-  'Going to the movies alone is the best way to see a movie.',
-  'If you\'re early you\'re on time, if you\'re on time you\'re late.',
-  'Ketchup on eggs is completely fine.',
-  'A taco is a sandwich.',
-  'You should be allowed to bring your own snacks to a movie theater.',
-  'It\'s okay to wear pajamas to the grocery store.',
-  'The best seat on a road trip is the back seat.',
-  'Wednesday is the best day of the week.',
-  'You should always make your bed in the morning.',
-  'Board games are better than video games.',
-  'Brunch is overrated.',
-  'Calling someone without texting first is unacceptable.',
-  'Cold pizza is better than reheated pizza.',
-  'Talking to strangers on a plane is fine.',
-  'Sleeping with socks on is acceptable behavior.',
-  'Pickles are a perfectly good snack on their own.',
-  'Splitting the bill evenly is fair even if you only had a salad.',
-];
 
 export default {
   id: 'hottakes',

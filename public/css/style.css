@@ -1218,7 +1218,7 @@ textarea.input {
 }
 .swatches {
   display: grid;
-  grid-template-columns: repeat(10, minmax(0, 1fr));
+  grid-template-columns: repeat(9, minmax(0, 1fr));
   gap: 6px;
 }
 .swatch {
@@ -1282,4 +1282,109 @@ textarea.input {
 }
 .host-bar .btn.small {
   padding: 7px 10px;
+}
+
+.entries {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.photo-wrap.loading::after {
+  content: 'Loading photo…';
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.tool-row {
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.tool-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  border: 2px solid transparent;
+  background: rgba(255, 255, 255, 0.1);
+  font-size: 20px;
+  padding: 0;
+}
+.tool-btn.on {
+  border-color: var(--primary);
+  background: rgba(255, 95, 162, 0.2);
+}
+
+/* one night werewolf */
+.ww-night,
+.ww-day {
+  font-weight: 800;
+  padding: 10px 14px;
+  border-radius: 14px;
+}
+.ww-night {
+  background: #0d0720;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.ww-day {
+  background: rgba(255, 210, 63, 0.14);
+  color: var(--yellow);
+}
+.ww-emoji {
+  font-size: 72px;
+  line-height: 1.1;
+}
+.ww-role.team-wolf {
+  border-color: var(--bad);
+  background: rgba(255, 77, 109, 0.1);
+}
+.ww-role.team-tanner {
+  border-color: var(--yellow);
+}
+.ww-info {
+  padding-left: 20px;
+  margin: 4px 0;
+}
+.ww-info li {
+  margin: 6px 0;
+}
+.ww-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.ww-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 8px;
+}
+.ww-pick {
+  border: 2px solid transparent;
+}
+.ww-pick.on {
+  border-color: var(--primary);
+  background: rgba(255, 95, 162, 0.22);
+}
+.ww-chip.team-wolf {
+  color: #ff8fa3;
+}
+.ww-chip.team-tanner {
+  color: var(--yellow);
+}
+.ww-row {
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.ww-row:last-child {
+  border-bottom: 0;
+}
+.ww-who {
+  font-weight: 800;
+}
+.ww-win {
+  color: var(--good);
+  font-size: 0.8rem;
 }
